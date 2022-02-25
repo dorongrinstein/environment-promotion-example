@@ -1,0 +1,58 @@
+# Control Plane GitHub Action
+
+name: 01-Deploy-To-Development-Control-Plane
+
+# Controls when the workflow will run
+on:
+  push:
+    branches:
+      - dev
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Convert the GitHub secret variables to environment variables for use by the Control Plane CLI
+env:
+  CPLN_ORG: ${{secrets.CPLN_ORG_DEVELOPMENT}}
+  CPLN_GVC: ${{secrets.CPLN_GVC}}
+  CPLN_WORKLOAD: ${{secrets.CPLN_WORKLOAD}}
+  CPLN_TOKEN: ${{secrets.CPLN_TOKEN_DEVELOPMENT}}
+  CPLN_IMAGE: ${{secrets.CPLN_IMAGE}}
+
+jobs:
+  deploy-to-development-control-plane:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Install Control Plane CLI
+        shell: bash
+        run: |
+          sudo npm install -g @controlplane/cli
+          cpln --version
+          echo "SHA: ${GITHUB_SHA}. Short SHA: ${GITHUB_SHA::7}"
+
+      - name: Containerize application and push image
+        shell: bash
+        run: |
+          cpln profile update default --token ${CPLN_TOKEN}
+          cpln image docker-login
+          cpln image build --name ${CPLN_IMAGE}:${GITHUB_SHA::7} --dockerfile ./Dockerfile --push
+
+      - name: Substitute Tokens in Control Plane YAML Files
+        shell: bash
+        working-directory: ./cpln
+        run: |
+          sed -i "s/GVC_NAME/${CPLN_GVC}/" cpln-gvc.yaml
+          sed -i "s/WORKLOAD_NAME/${CPLN_WORKLOAD}/" cpln-workload.yaml
+          sed -i "s/IMAGE_NAME_TAG/\/\/image\/${CPLN_IMAGE}:${GITHUB_SHA::7}/" cpln-workload.yaml
+
+      - name: Run CPLN Apply 
+        shell: bash
+        working-directory: ./cpln
+        run: |
+          cpln apply -f cpln-gvc.yaml
+          cpln apply -f cpln-workload.yaml --gvc ${CPLN_GVC}
+    

@@ -1,0 +1,63 @@
+# Control Plane GitHub Action
+
+name: 03-Deploy-To-Production-Control-Plane
+
+# Controls when the workflow will run
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Convert the GitHub secret variables to environment variables for use by the Control Plane CLI
+env:
+  CPLN_ORG: ${{secrets.CPLN_ORG_PRODUCTION}}
+  CPLN_ORG_DEVELOPMENT: ${{secrets.CPLN_ORG_DEVELOPMENT}}
+  CPLN_GVC: ${{secrets.CPLN_GVC}}
+  CPLN_WORKLOAD: ${{secrets.CPLN_WORKLOAD}}
+  CPLN_TOKEN_DEVELOPMENT: ${{secrets.CPLN_TOKEN_DEVELOPMENT}}
+  CPLN_TOKEN: ${{secrets.CPLN_TOKEN_PRODUCTION}}
+  CPLN_IMAGE: ${{secrets.CPLN_IMAGE}}
+
+jobs:
+  deploy-to-production-control-plane:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.action == 'closed' && github.event.pull_request.merged == true}}
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Set Short SHA
+        run: echo "SHORT_SHA=`echo ${{ github.event.pull_request.head.sha }} | cut -c1-7`" >> $GITHUB_ENV
+
+      - name: Install Control Plane CLI
+        shell: bash
+        run: |
+          sudo npm install -g @controlplane/cli
+          cpln --version
+          echo "Action: ${{ github.event.action }}. Merged: ${{ github.event.pull_request.merged }}."
+          echo "${SHORT_SHA}"
+
+      - name: Substitute Tokens in Control Plane YAML Files
+        shell: bash
+        working-directory: ./cpln
+        run: |
+          sed -i "s/ORG_NAME_DEVELOPMENT/${CPLN_ORG_DEVELOPMENT}/" cpln-gvc-prod.yaml
+          sed -i "s/GVC_NAME/${CPLN_GVC}/" cpln-gvc-prod.yaml
+          sed -i "s/CPLN_TOKEN/${CPLN_TOKEN_DEVELOPMENT}/" cpln-gvc-prod.yaml
+          sed -i "s/WORKLOAD_NAME/${CPLN_WORKLOAD}/" cpln-workload.yaml
+          sed -i "s/IMAGE_NAME_TAG/${CPLN_ORG_DEVELOPMENT}.registry.cpln.io\/${CPLN_IMAGE}:${SHORT_SHA}/" cpln-workload.yaml
+
+      - name: Run CPLN Apply 
+        shell: bash
+        working-directory: ./cpln
+        run: |
+          cpln profile update default --token ${CPLN_TOKEN}
+          cpln apply -f cpln-gvc-prod.yaml
+          cpln apply -f cpln-workload.yaml --gvc ${CPLN_GVC}
+    
