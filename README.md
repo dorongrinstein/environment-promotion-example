@@ -1,6 +1,6 @@
 # Control Plane - Environment Promotion Example
 
-This example demonstrates the promotion of an application to upstream environments (development -> production) using
+This example demonstrates the promotion of an application to downstream environments (development -> production) using
 Control Plane and GitHub Actions. As part of the promotion process, a `Staging Workload` is deployed to test
 updates before promoting to production.
 
