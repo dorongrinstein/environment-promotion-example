@@ -11,6 +11,7 @@ kind: gvc
 name: GVC_NAME
 description: Promote Example
 spec:
+  domain: api.upsie.xyz
   pullSecretLinks:
     - //secret/dev-pull-secret
   staticPlacement:
