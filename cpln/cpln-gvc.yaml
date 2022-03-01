@@ -5,3 +5,4 @@ spec:
   staticPlacement:
     locationLinks:
       - //location/aws-us-west-2
+      - //location/aws-us-east-2
